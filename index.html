@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intraday Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/[email protected]/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root{
+    --bg:#0A0E12; --surface:#12171D; --surface-2:#161C23; --border:#232A33;
+    --text:#E8EDF2; --text-muted:#7C8A9A;
+    --bull:#26D07C; --bear:#E5484D;
+    --amber:#E8A33D; --teal:#4FB6C4; --violet:#B48EAD;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;} }
+
+  .wrap{max-width:1100px;margin:0 auto;padding:16px;}
+
+  header.top{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    padding:14px 16px; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    margin-bottom:12px;
+  }
+  .symbol-block{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;}
+  .symbol-name{font-size:15px; font-weight:600; letter-spacing:0.02em;}
+  .symbol-sub{font-size:11px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace;}
+  .price{font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:500;}
+  .change{font-family:'IBM Plex Mono',monospace; font-size:13px; padding:2px 8px; border-radius:5px;}
+  .change-positive{color:var(--bull); background:rgba(38,208,124,0.1);}
+  .change-negative{color:var(--bear); background:rgba(229,72,77,0.1);}
+
+  .top-right{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+  .demo-badge{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.06em;
+    color:var(--amber); border:1px solid rgba(232,163,61,0.4); background:rgba(232,163,61,0.08);
+    padding:3px 8px; border-radius:20px; text-transform:uppercase;
+  }
+  .regen-btn{
+    background:var(--surface-2); border:1px solid var(--border); color:var(--text-muted);
+    font-family:'IBM Plex Mono',monospace; font-size:11px; padding:5px 10px; border-radius:6px;
+    cursor:pointer; transition:border-color 0.15s, color 0.15s;
+  }
+  .regen-btn:hover{border-color:var(--amber); color:var(--amber);}
+  .regen-btn:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  .connect-btn{
+    background:var(--amber); border:1px solid var(--amber); color:var(--bg);
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; padding:5px 12px; border-radius:6px;
+    cursor:pointer; transition:opacity 0.15s;
+  }
+  .connect-btn:hover{opacity:0.85;}
+  .connect-btn:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  .tf-row{display:flex; gap:6px; margin-bottom:12px;}
+  .tf-btn{
+    background:var(--surface); border:1px solid var(--border); color:var(--text-muted);
+    font-family:'IBM Plex Mono',monospace; font-size:12px; padding:6px 14px; border-radius:7px;
+    cursor:pointer; transition:border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .tf-btn:hover{color:var(--text);}
+  .tf-btn.active{color:var(--bg); background:var(--amber); border-color:var(--amber); font-weight:600;}
+  .tf-btn:focus-visible{outline:2px solid var(--amber); outline-offset:2px;}
+
+  .panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:10px 12px 4px; margin-bottom:10px;
+  }
+  .panel-label{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted);
+    letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px; display:flex; justify-content:space-between;
+  }
+  .panel-label .note{color:var(--text-muted); text-transform:none; letter-spacing:0;}
+  #mainChart{height:380px;}
+  #rsiChart{height:120px;}
+  #macdChart{height:120px;}
+
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:10px; font-family:'IBM Plex Mono',monospace; color:var(--text-muted); margin-bottom:6px;}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .dot{width:8px;height:2px;display:inline-block;border-radius:1px;}
+
+  .signal-strip{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:14px 16px;
+  }
+  .signal-strip-title{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted);
+    letter-spacing:0.08em; text-transform:uppercase; margin-bottom:10px;
+  }
+  #signalSummary{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px;}
+  .signal-item{
+    display:flex; flex-direction:column; gap:3px; padding:8px 10px;
+    background:var(--surface-2); border-radius:7px; border:1px solid var(--border);
+  }
+  .signal-label{font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--text-muted); letter-spacing:0.04em;}
+  .signal-bull{color:var(--bull); font-weight:600; font-size:13px;}
+  .signal-bear{color:var(--bear); font-weight:600; font-size:13px;}
+  .signal-neutral{color:var(--text-muted); font-weight:600; font-size:13px;}
+
+  footer{
+    margin-top:14px; padding:12px 4px; font-size:11px; color:var(--text-muted);
+    font-family:'IBM Plex Mono',monospace; line-height:1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="symbol-block">
+      <span class="symbol-name">SAMPLE · NSE</span>
+      <span class="price" id="currentPrice">—</span>
+      <span class="change mono" id="priceChange">—</span>
+      <span class="symbol-sub">5-min OHLC · simulated</span>
+    </div>
+    <div class="top-right">
+      <span class="demo-badge" id="demoBadge">Demo Data</span>
+      <button class="connect-btn" id="connectBtn">Connect to Zerodha</button>
+      <button class="regen-btn" id="regenBtn">↻ Regenerate</button>
+    </div>
+  </header>
+
+  <div class="tf-row">
+    <button class="tf-btn" id="tf-1" data-tf="1">1m</button>
+    <button class="tf-btn active" id="tf-5" data-tf="5">5m</button>
+    <button class="tf-btn" id="tf-15" data-tf="15">15m</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">Price · EMA 9/20 · Bollinger (20,2) · VWAP</div>
+    <div class="legend">
+      <span><i class="dot" style="background:#E8A33D"></i>EMA 9</span>
+      <span><i class="dot" style="background:#4FB6C4"></i>EMA 20</span>
+      <span><i class="dot" style="background:#B48EAD"></i>VWAP</span>
+      <span><i class="dot" style="background:rgba(124,138,154,0.6)"></i>Bollinger Bands</span>
+    </div>
+    <div id="mainChart"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">RSI (9) <span class="note">30 / 70 reference lines</span></div>
+    <div id="rsiChart"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-label">MACD (12, 26, 9)</div>
+    <div id="macdChart"></div>
+  </div>
+
+  <div class="signal-strip">
+    <div class="signal-strip-title">Signal Summary — latest candle</div>
+    <div id="signalSummary"></div>
+  </div>
+
+  <footer>
+    Simulated data for layout/indicator testing — not live market data.<br>
+    Next step: wire this to Kite Connect (historical candles + WebSocket ticks) once your API access is set up.
+  </footer>
+
+</div>
+
+<script>
+/* ============================================================
+   INDICATOR MATH
+   ============================================================ */
+
+function ema(values, period){
+  const result = new Array(values.length).fill(null);
+  if (values.length < period) return result;
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += values[i];
+  let prev = sum / period;
+  result[period - 1] = prev;
+  const k = 2 / (period + 1);
+  for (let i = period; i < values.length; i++){
+    prev = values[i] * k + prev * (1 - k);
+    result[i] = prev;
+  }
+  return result;
+}
+
+function rsi(closes, period){
+  const result = new Array(closes.length).fill(null);
+  if (closes.length <= period) return result;
+  let gainSum = 0, lossSum = 0;
+  for (let i = 1; i <= period; i++){
+    const diff = closes[i] - closes[i - 1];
+    if (diff >= 0) gainSum += diff; else lossSum -= diff;
+  }
+  let avgGain = gainSum / period, avgLoss = lossSum / period;
+  result[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  for (let i = period + 1; i < closes.length; i++){
+    const diff = closes[i] - closes[i - 1];
+    const gain = diff > 0 ? diff : 0;
+    const loss = diff < 0 ? -diff : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    result[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+  return result;
+}
+
+function macd(closes, fastPeriod, slowPeriod, signalPeriod){
+  const fastEma = ema(closes, fastPeriod);
+  const slowEma = ema(closes, slowPeriod);
+  const macdLine = closes.map((_, i) =>
+    (fastEma[i] !== null && slowEma[i] !== null) ? fastEma[i] - slowEma[i] : null
+  );
+  const validPoints = [];
+  macdLine.forEach(v => { if (v !== null) validPoints.push(v); });
+  const signalEmaOnValid = ema(validPoints, signalPeriod);
+  const signalLine = new Array(closes.length).fill(null);
+  let vi = 0;
+  for (let i = 0; i < closes.length; i++){
+    if (macdLine[i] !== null){
+      signalLine[i] = signalEmaOnValid[vi];
+      vi++;
+    }
+  }
+  const histogram = closes.map((_, i) =>
+    (macdLine[i] !== null && signalLine[i] !== null) ? macdLine[i] - signalLine[i] : null
+  );
+  return { macdLine, signalLine, histogram };
+}
+
+function bollingerBands(closes, period, mult){
+  const upper = new Array(closes.length).fill(null);
+  const middle = new Array(closes.length).fill(null);
+  const lower = new Array(closes.length).fill(null);
+  if (closes.length < period) return { upper, middle, lower };
+  for (let i = period - 1; i < closes.length; i++){
+    const slice = closes.slice(i - period + 1, i + 1);
+    const mean = slice.reduce((a, b) => a + b, 0) / period;
+    const variance = slice.reduce((a, b) => a + (b - mean) ** 2, 0) / period;
+    const sd = Math.sqrt(variance);
+    upper[i] = mean + mult * sd;
+    middle[i] = mean;
+    lower[i] = mean - mult * sd;
+  }
+  return { upper, middle, lower };
+}
+
+function vwap(candles){
+  let cumTPV = 0, cumVol = 0;
+  return candles.map(c => {
+    const tp = (c.high + c.low + c.close) / 3;
+    cumTPV += tp * c.volume;
+    cumVol += c.volume;
+    return cumVol === 0 ? null : cumTPV / cumVol;
+  });
+}
+
+/* ============================================================
+   MOCK DATA — replace this function with a real Kite Connect
+   historical-candles fetch (+ WebSocket ticks for the live edge)
+   once API access is set up.
+   ============================================================ */
+
+function generateMockData(intervalMinutes){
+  const candles = [];
+  let price = 2450;
+  const now = new Date();
+  const y = now.getUTCFullYear(), mo = now.getUTCMonth(), d = now.getUTCDate();
+  const startMin = 9 * 60 + 15;   // 9:15 session open
+  const endMin = 15 * 60 + 30;    // 15:30 session close
+  const volBase = 50000 * intervalMinutes;
+  const ticksPerCandle = Math.max(1, intervalMinutes);
+
+  for (let mins = startMin; mins < endMin; mins += intervalMinutes){
+    const hh = Math.floor(mins / 60), mm = mins % 60;
+    const timestamp = Date.UTC(y, mo, d, hh, mm, 0) / 1000;
+    const open = price;
+    let high = open, low = open;
+    for (let t = 0; t < ticksPerCandle; t++){
+      const drift = 0.0002;
+      const change = (Math.random() - 0.5 + drift) * (price * 0.0012);
+      price = Math.max(price + change, 1);
+      high = Math.max(high, price);
+      low = Math.min(low, price);
+    }
+    const close = price;
+    const volume = Math.round(volBase * (0.6 + Math.random() * 0.8));
+    candles.push({
+      time: timestamp,
+      open: +open.toFixed(2),
+      high: +Math.max(high, open, close).toFixed(2),
+      low: +Math.min(low, open, close).toFixed(2),
+      close: +close.toFixed(2),
+      volume
+    });
+  }
+  return candles;
+}
+
+/* ============================================================
+   CHART RENDERING
+   ============================================================ */
+
+let charts = [];
+let syncing = false;
+
+function baseChartOptions(){
+  return {
+    layout: { background: { color: 'transparent' }, textColor: '#7C8A9A', fontFamily: 'IBM Plex Mono, monospace', fontSize: 11 },
+    grid: { vertLines: { color: '#1A2129' }, horzLines: { color: '#1A2129' } },
+    rightPriceScale: { borderColor: '#232A33' },
+    timeScale: { borderColor: '#232A33', timeVisible: true, secondsVisible: false },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    autoSize: true,
+  };
+}
+
+function syncTimeScales(chartList){
+  chartList.forEach(chart => {
+    chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      if (syncing || !range) return;
+      syncing = true;
+      chartList.forEach(c => { if (c !== chart) c.timeScale().setVisibleLogicalRange(range); });
+      syncing = false;
+    });
+  });
+}
+
+function renderCharts(candles){
+  charts.forEach(c => c.remove());
+  charts = [];
+  ['mainChart','rsiChart','macdChart'].forEach(id => document.getElementById(id).innerHTML = '');
+
+  const closes = candles.map(c => c.close);
+  const ema9 = ema(closes, 9);
+  const ema20 = ema(closes, 20);
+  const rsiVals = rsi(closes, 9);
+  const macdRes = macd(closes, 12, 26, 9);
+  const bb = bollingerBands(closes, 20, 2);
+  const vwapVals = vwap(candles);
+
+  // ---- Main price chart ----
+  const mainChart = LightweightCharts.createChart(document.getElementById('mainChart'), { ...baseChartOptions(), height: 380 });
+  const candleSeries = mainChart.addCandlestickSeries({
+    upColor: '#26D07C', downColor: '#E5484D', borderVisible: false,
+    wickUpColor: '#26D07C', wickDownColor: '#E5484D',
+  });
+  candleSeries.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
+
+  const ema9Series = mainChart.addLineSeries({ color: '#E8A33D', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+  ema9Series.setData(candles.map((c,i) => ema9[i] !== null ? { time: c.time, value: ema9[i] } : null).filter(Boolean));
+
+  const ema20Series = mainChart.addLineSeries({ color: '#4FB6C4', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+  ema20Series.setData(candles.map((c,i) => ema20[i] !== null ? { time: c.time, value: ema20[i] } : null).filter(Boolean));
+
+  const vwapSeries = mainChart.addLineSeries({ color: '#B48EAD', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
+  vwapSeries.setData(candles.map((c,i) => vwapVals[i] !== null ? { time: c.time, value: vwapVals[i] } : null).filter(Boolean));
+
+  const bbUpperSeries = mainChart.addLineSeries({ color: 'rgba(124,138,154,0.5)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+  bbUpperSeries.setData(candles.map((c,i) => bb.upper[i] !== null ? { time: c.time, value: bb.upper[i] } : null).filter(Boolean));
+
+  const bbLowerSeries = mainChart.addLineSeries({ color: 'rgba(124,138,154,0.5)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+  bbLowerSeries.setData(candles.map((c,i) => bb.lower[i] !== null ? { time: c.time, value: bb.lower[i] } : null).filter(Boolean));
+
+  // ---- RSI panel ----
+  const rsiChart = LightweightCharts.createChart(document.getElementById('rsiChart'), { ...baseChartOptions(), height: 120 });
+  const rsiSeries = rsiChart.addLineSeries({ color: '#E8A33D', lineWidth: 1.5 });
+  rsiSeries.setData(candles.map((c,i) => rsiVals[i] !== null ? { time: c.time, value: rsiVals[i] } : null).filter(Boolean));
+  rsiSeries.createPriceLine({ price: 70, color: 'rgba(229,72,77,0.6)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'OB' });
+  rsiSeries.createPriceLine({ price: 30, color: 'rgba(38,208,124,0.6)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'OS' });
+
+  // ---- MACD panel ----
+  const macdChart = LightweightCharts.createChart(document.getElementById('macdChart'), { ...baseChartOptions(), height: 120 });
+  const histSeries = macdChart.addHistogramSeries({});
+  histSeries.setData(candles.map((c,i) => {
+    if (macdRes.histogram[i] === null) return null;
+    return { time: c.time, value: macdRes.histogram[i], color: macdRes.histogram[i] >= 0 ? 'rgba(38,208,124,0.6)' : 'rgba(229,72,77,0.6)' };
+  }).filter(Boolean));
+  const macdLineSeries = macdChart.addLineSeries({ color: '#E8A33D', lineWidth: 1.5 });
+  macdLineSeries.setData(candles.map((c,i) => macdRes.macdLine[i] !== null ? { time: c.time, value: macdRes.macdLine[i] } : null).filter(Boolean));
+  const signalLineSeries = macdChart.addLineSeries({ color: '#4FB6C4', lineWidth: 1.5 });
+  signalLineSeries.setData(candles.map((c,i) => macdRes.signalLine[i] !== null ? { time: c.time, value: macdRes.signalLine[i] } : null).filter(Boolean));
+
+  charts = [mainChart, rsiChart, macdChart];
+  syncTimeScales(charts);
+
+  updateHeader(candles);
+  updateSignalSummary(candles, ema9, ema20, rsiVals, macdRes, vwapVals, bb);
+}
+
+/* ============================================================
+   HEADER + SIGNAL SUMMARY
+   ============================================================ */
+
+function updateHeader(candles){
+  const last = candles[candles.length - 1];
+  const first = candles[0];
+  const change = last.close - first.open;
+  const changePct = (change / first.open) * 100;
+  document.getElementById('currentPrice').textContent = '₹' + last.close.toFixed(2);
+  const changeEl = document.getElementById('priceChange');
+  changeEl.textContent = (change >= 0 ? '▲ ' : '▼ ') + Math.abs(change).toFixed(2) + ' (' + Math.abs(changePct).toFixed(2) + '%)';
+  changeEl.className = 'change mono ' + (change >= 0 ? 'change-positive' : 'change-negative');
+}
+
+function updateSignalSummary(candles, ema9, ema20, rsiVals, macdRes, vwapVals, bb){
+  const i = candles.length - 1;
+  const last = candles[i];
+  const rows = [];
+
+  if (ema9[i] !== null && ema20[i] !== null){
+    const bull = ema9[i] > ema20[i];
+    rows.push({ label:'EMA 9/20', value: bull ? 'Bullish' : 'Bearish', cls: bull ? 'signal-bull' : 'signal-bear' });
+  } else rows.push({ label:'EMA 9/20', value:'No data', cls:'signal-neutral' });
+
+  if (rsiVals[i] !== null){
+    const v = rsiVals[i];
+    let label = 'Neutral (' + v.toFixed(0) + ')', cls = 'signal-neutral';
+    if (v > 70){ label = 'Overbought (' + v.toFixed(0) + ')'; cls = 'signal-bear'; }
+    else if (v < 30){ label = 'Oversold (' + v.toFixed(0) + ')'; cls = 'signal-bull'; }
+    rows.push({ label:'RSI (9)', value:label, cls });
+  } else rows.push({ label:'RSI (9)', value:'No data', cls:'signal-neutral' });
+
+  if (macdRes.macdLine[i] !== null && macdRes.signalLine[i] !== null){
+    const bull = macdRes.macdLine[i] > macdRes.signalLine[i];
+    rows.push({ label:'MACD', value: bull ? 'Bullish' : 'Bearish', cls: bull ? 'signal-bull' : 'signal-bear' });
+  } else rows.push({ label:'MACD', value:'Insufficient data', cls:'signal-neutral' });
+
+  if (vwapVals[i] !== null){
+    const above = last.close > vwapVals[i];
+    rows.push({ label:'VWAP', value: above ? 'Above (Bullish)' : 'Below (Bearish)', cls: above ? 'signal-bull' : 'signal-bear' });
+  } else rows.push({ label:'VWAP', value:'No data', cls:'signal-neutral' });
+
+  if (bb.upper[i] !== null){
+    let label = 'Within Bands', cls = 'signal-neutral';
+    if (last.close > bb.upper[i]){ label = 'Above Upper'; cls = 'signal-bear'; }
+    else if (last.close < bb.lower[i]){ label = 'Below Lower'; cls = 'signal-bull'; }
+    rows.push({ label:'Bollinger', value:label, cls });
+  } else rows.push({ label:'Bollinger', value:'No data', cls:'signal-neutral' });
+
+  document.getElementById('signalSummary').innerHTML = rows.map(r =>
+    `<div class="signal-item"><span class="signal-label">${r.label}</span><span class="${r.cls}">${r.value}</span></div>`
+  ).join('');
+}
+
+/* ============================================================
+   UI WIRING
+   ============================================================ */
+
+let currentTf = 5;
+
+function setTimeframe(minutes){
+  currentTf = minutes;
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tf-' + minutes).classList.add('active');
+  renderCharts(generateMockData(minutes));
+}
+
+document.querySelectorAll('.tf-btn').forEach(btn => {
+  btn.addEventListener('click', () => setTimeframe(parseInt(btn.dataset.tf, 10)));
+});
+document.getElementById('regenBtn').addEventListener('click', () => renderCharts(generateMockData(currentTf)));
+
+setTimeframe(5);
+
+/* ============================================================
+   KITE CONNECT — OAuth handshake
+   Fill in these two values once your app + Cloud Function exist:
+   1. KITE_API_KEY        — from developers.kite.trade (My Apps)
+   2. CLOUD_FUNCTION_URL  — printed after `firebase deploy --only functions`
+   This only proves the login works and stores an access_token.
+   Swapping generateMockData() for real candles is the next step.
+   ============================================================ */
+
+const KITE_API_KEY = "YOUR_KITE_API_KEY";
+const CLOUD_FUNCTION_URL = "https://REGION-PROJECT_ID.cloudfunctions.net/kiteTokenExchange";
+
+let kiteAccessToken = sessionStorage.getItem('kite_access_token') || null;
+
+function connectToZerodha(){
+  window.location.href = `https://kite.zerodha.com/connect/login?v=3&api_key=${KITE_API_KEY}`;
+}
+
+async function handleKiteRedirect(){
+  const params = new URLSearchParams(window.location.search);
+  const requestToken = params.get('request_token');
+  const status = params.get('status');
+  if (!requestToken) return;
+
+  // Strip the query string so a page refresh doesn't resend a used/expired request_token
+  window.history.replaceState({}, document.title, window.location.pathname);
+
+  if (status !== 'success'){
+    alert('Zerodha login did not complete successfully.');
+    return;
+  }
+
+  try {
+    const res = await fetch(CLOUD_FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ request_token: requestToken })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Token exchange failed');
+
+    kiteAccessToken = data.access_token;
+    sessionStorage.setItem('kite_access_token', kiteAccessToken);
+    updateConnectionUI(data.user_id);
+  } catch (err){
+    alert('Could not connect to Zerodha: ' + err.message);
+  }
+}
+
+function updateConnectionUI(userId){
+  const badge = document.getElementById('demoBadge');
+  const btn = document.getElementById('connectBtn');
+  badge.textContent = 'Connected · ' + userId;
+  badge.style.color = 'var(--bull)';
+  badge.style.borderColor = 'rgba(38,208,124,0.4)';
+  badge.style.background = 'rgba(38,208,124,0.08)';
+  btn.textContent = 'Reconnect';
+}
+
+document.getElementById('connectBtn').addEventListener('click', connectToZerodha);
+
+if (kiteAccessToken) {
+  updateConnectionUI('session');
+} else {
+  handleKiteRedirect();
+}
+</script>
+</body>
+</html>
