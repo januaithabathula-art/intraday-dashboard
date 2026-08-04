@@ -346,44 +346,44 @@ function renderCharts(candles){
 
   // ---- Main price chart ----
   const mainChart = LightweightCharts.createChart(document.getElementById('mainChart'), { ...baseChartOptions(), height: 380 });
-  const candleSeries = mainChart.addCandlestickSeries({
+  const candleSeries = mainChart.addSeries(LightweightCharts.CandlestickSeries, {
     upColor: '#26D07C', downColor: '#E5484D', borderVisible: false,
     wickUpColor: '#26D07C', wickDownColor: '#E5484D',
   });
   candleSeries.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
 
-  const ema9Series = mainChart.addLineSeries({ color: '#E8A33D', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+  const ema9Series = mainChart.addSeries(LightweightCharts.LineSeries, { color: '#E8A33D', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
   ema9Series.setData(candles.map((c,i) => ema9[i] !== null ? { time: c.time, value: ema9[i] } : null).filter(Boolean));
 
-  const ema20Series = mainChart.addLineSeries({ color: '#4FB6C4', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+  const ema20Series = mainChart.addSeries(LightweightCharts.LineSeries, { color: '#4FB6C4', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
   ema20Series.setData(candles.map((c,i) => ema20[i] !== null ? { time: c.time, value: ema20[i] } : null).filter(Boolean));
 
-  const vwapSeries = mainChart.addLineSeries({ color: '#B48EAD', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
+  const vwapSeries = mainChart.addSeries(LightweightCharts.LineSeries, { color: '#B48EAD', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, priceLineVisible: false, lastValueVisible: false });
   vwapSeries.setData(candles.map((c,i) => vwapVals[i] !== null ? { time: c.time, value: vwapVals[i] } : null).filter(Boolean));
 
-  const bbUpperSeries = mainChart.addLineSeries({ color: 'rgba(124,138,154,0.5)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+  const bbUpperSeries = mainChart.addSeries(LightweightCharts.LineSeries, { color: 'rgba(124,138,154,0.5)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
   bbUpperSeries.setData(candles.map((c,i) => bb.upper[i] !== null ? { time: c.time, value: bb.upper[i] } : null).filter(Boolean));
 
-  const bbLowerSeries = mainChart.addLineSeries({ color: 'rgba(124,138,154,0.5)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+  const bbLowerSeries = mainChart.addSeries(LightweightCharts.LineSeries, { color: 'rgba(124,138,154,0.5)', lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
   bbLowerSeries.setData(candles.map((c,i) => bb.lower[i] !== null ? { time: c.time, value: bb.lower[i] } : null).filter(Boolean));
 
   // ---- RSI panel ----
   const rsiChart = LightweightCharts.createChart(document.getElementById('rsiChart'), { ...baseChartOptions(), height: 120 });
-  const rsiSeries = rsiChart.addLineSeries({ color: '#E8A33D', lineWidth: 1.5 });
+  const rsiSeries = rsiChart.addSeries(LightweightCharts.LineSeries, { color: '#E8A33D', lineWidth: 1.5 });
   rsiSeries.setData(candles.map((c,i) => rsiVals[i] !== null ? { time: c.time, value: rsiVals[i] } : null).filter(Boolean));
   rsiSeries.createPriceLine({ price: 70, color: 'rgba(229,72,77,0.6)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'OB' });
   rsiSeries.createPriceLine({ price: 30, color: 'rgba(38,208,124,0.6)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title: 'OS' });
 
   // ---- MACD panel ----
   const macdChart = LightweightCharts.createChart(document.getElementById('macdChart'), { ...baseChartOptions(), height: 120 });
-  const histSeries = macdChart.addHistogramSeries({});
+  const histSeries = macdChart.addSeries(LightweightCharts.HistogramSeries, {});
   histSeries.setData(candles.map((c,i) => {
     if (macdRes.histogram[i] === null) return null;
     return { time: c.time, value: macdRes.histogram[i], color: macdRes.histogram[i] >= 0 ? 'rgba(38,208,124,0.6)' : 'rgba(229,72,77,0.6)' };
   }).filter(Boolean));
-  const macdLineSeries = macdChart.addLineSeries({ color: '#E8A33D', lineWidth: 1.5 });
+  const macdLineSeries = macdChart.addSeries(LightweightCharts.LineSeries, { color: '#E8A33D', lineWidth: 1.5 });
   macdLineSeries.setData(candles.map((c,i) => macdRes.macdLine[i] !== null ? { time: c.time, value: macdRes.macdLine[i] } : null).filter(Boolean));
-  const signalLineSeries = macdChart.addLineSeries({ color: '#4FB6C4', lineWidth: 1.5 });
+  const signalLineSeries = macdChart.addSeries(LightweightCharts.LineSeries, { color: '#4FB6C4', lineWidth: 1.5 });
   signalLineSeries.setData(candles.map((c,i) => macdRes.signalLine[i] !== null ? { time: c.time, value: macdRes.signalLine[i] } : null).filter(Boolean));
 
   charts = [mainChart, rsiChart, macdChart];
